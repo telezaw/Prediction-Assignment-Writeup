@@ -1,0 +1,94 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Zaw Chit"
+date: "11/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset)
+
+## Introduction
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+
+## Training & Test Data Set
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+# Analysis
+
+
+```{r}
+#load libraries 
+library(caret)
+library(knitr)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+#Loading data:
+
+set.seed(12463)
+urltrain <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+urltest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(url(urltrain), stringsAsFactors=FALSE)
+testingset <- read.csv(url(urltest), stringsAsFactors=FALSE)
+
+#Several columns of the raw data have no values.So,these columns and some columns which are not related to predict outcome  will be removed first.
+training$classe <- as.factor(training$classe)
+training <- training[,-nearZeroVar(training)]
+training <- training[,-c(1,2,3,4,5,6,7)]
+```
+
+
+```{r}
+
+#Cross validation will be performed by splitting the training dataset into:
+
+#1) The models for prediction will be built on training data set which is 70% of the observations.
+
+#2)The accuracy of the prediction models will be evaluated on testing data which is 30% of the observations.
+
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+training <- training[inTrain,]
+testing <- training[-inTrain,]
+#Imputing NA value using KNN impute method
+preObj <- preProcess(training[,-length(training)],method=c("center", "scale", "knnImpute", "pca"), thresh=0.9)
+clean_data <- predict(preObj,training[,-length(training)])
+
+```
+
+```{r feature decision tree}
+## Prediction 1 Decision Tree
+decisionTreeModel <- rpart(classe ~ ., data = training, method = "class")
+decisionTreePrediction <- predict(decisionTreeModel, testing, type = "class")
+
+# Plot Decision Tree
+rpart.plot(decisionTreeModel, main = "Decision Tree", under = T, faclen = 0)
+
+# Using confusion matrix to test results
+confusionMatrix(decisionTreePrediction,testing$classe) 
+
+```
+
+```{r random forest}
+# Prediction 2 Random Forest
+randomForestModel <- randomForest(training$classe ~., data = clean_data, method = "class")
+test <- predict(preObj, testing[,-length(testing)])
+confusionMatrix(testing$classe, predict(randomForestModel,test))
+```
+
+## Prediction Final
+From the result, it show Random Forest accuracy is higher than Decision tree which is 0.9991> 0.6945. Therefore, we will use random forest to answer the assignment. 
